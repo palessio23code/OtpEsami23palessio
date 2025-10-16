@@ -13,11 +13,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     /*
-     * v3.7 - Miglioramenti UI/UX e Mobile
-     * - Aumentata ombra agli input in tema chiaro per maggiore risalto.
-     * - Migliorato hover effect per le card dei risultati in tema scuro (glow).
-     * - Resa la tabella di selezione manuale responsiva per mobile (card layout).
-     * - Migliorata la visualizzazione dei piani salvati su schermi piccoli.
+     * v3.8 - Correzioni Mobile
+     * - Reso l'header responsive: lo switch del tema ora si posiziona correttamente su mobile.
+     * - La tabella nel modale diventa una lista di "card" su mobile per una leggibilità ottimale.
+     * - Sistemato il centraggio del modale su mobile, che era causato dall'overflow della tabella.
     */
     :root {
       --background: #f1f5f9;
@@ -373,21 +372,26 @@
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
 
-    /* Stili per la responsività mobile */
+    /* Stili per la responsività mobile (da 768px in giù) */
     @media screen and (max-width: 768px) {
+      /* Nasconde l'header della tabella */
       .table thead {
         display: none;
       }
+      /* Rende gli elementi della tabella dei blocchi */
       .table, .table tbody, .table tr, .table td {
         display: block;
         width: 100%;
       }
+      /* Trasforma ogni riga in una card */
       .table tr {
         margin-bottom: 1rem;
         border: 1px solid var(--border-color);
-        border-radius: 0.5rem;
-        padding: .5rem;
+        border-radius: 0.75rem;
+        padding: 0.5rem;
+        background: var(--input-bg);
       }
+      /* Stile per le celle/righe dati */
       .table td {
         text-align: right;
         position: relative;
@@ -397,7 +401,7 @@
         padding-bottom: .75rem;
       }
       .table tbody tr:hover {
-        background-color: transparent;
+        background-color: transparent; /* Disabilita hover su mobile */
       }
       .table tr:last-child {
         margin-bottom: 0;
@@ -405,6 +409,7 @@
       .table td:last-child {
         border-bottom: 0;
       }
+      /* Aggiunge l'etichetta a sinistra di ogni dato */
       .table td::before {
         content: attr(data-label);
         position: absolute;
@@ -415,15 +420,15 @@
         color: var(--foreground-primary);
         white-space: nowrap;
       }
-      /* Stili specifici per le celle con checkbox */
+      /* Stili specifici per le celle con i checkbox per allinearli */
       .table td:nth-child(1), .table td:nth-child(2) {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding-left: .75rem; /* Rimuove il padding per il label */
+          padding-left: .75rem;
       }
       .table td:nth-child(1)::before, .table td:nth-child(2)::before {
-          position: static; /* Rimuove posizionamento assoluto */
+          position: static;
           width: auto;
           font-weight: normal;
           color: var(--foreground-secondary);
@@ -440,11 +445,13 @@
   </div>
 
   <div class="container mx-auto p-4 md:p-8 max-w-5xl">
-    <header class="text-center mb-8 relative">
-       <h1 class="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-cyan-400 animated-gradient">Ottimizzatore Piano Esami</h1>
-      <p class="text-foreground-secondary mt-2 max-w-xl mx-auto">Carica il tuo file JSON degli appelli, imposta i vincoli e trova il piano di studi perfetto per te.</p>
-      <div class="absolute top-0 right-0">
-        <button id="theme-toggle" class="p-2 rounded-full hover:bg-slate-500/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" aria-label="Toggle light/dark theme">
+    
+    <header class="flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center mb-8 gap-4">
+      <div class="text-center sm:text-left">
+         <h1 class="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-cyan-400 animated-gradient">Ottimizzatore Piano Esami</h1>
+        <p class="text-foreground-secondary mt-2 max-w-xl mx-auto sm:mx-0">Carica il tuo file JSON degli appelli, imposta i vincoli e trova il piano di studi perfetto per te.</p>
+      </div>
+      <div> <button id="theme-toggle" class="p-2 rounded-full hover:bg-slate-500/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" aria-label="Toggle light/dark theme">
           <svg id="theme-icon-light" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0z"/></svg>
           <svg id="theme-icon-dark" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 0 1 8.646 3.646 9.003 9.003 0 0 0 12 21a9.003 9.003 0 0 0 8.354-5.646z"/></svg>
         </button>
@@ -818,6 +825,7 @@
         .sort((a,b)=>a.dt-b.dt);
     }
 
+    // Aggiunge gli attributi 'data-label' per la visualizzazione mobile
     function buildExamList(){
       const body=document.getElementById('exam-list'); body.innerHTML='';
       currentRows().forEach(r=>{
@@ -958,7 +966,7 @@
       out.innerHTML='';
       saved.forEach((s,idx)=>{
         const when=new Date(s.date).toLocaleString('it-IT'); const sedi=[...new Set(s.plan.map(p=>p.Sede))].join(', ');
-        out.innerHTML += `<div class="p-4 border border-border-color rounded-lg flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 transition-all duration-300 cursor-pointer hover:shadow-md hover:border-primary/30 dark:hover:border-primary/30 hover:bg-primary/5 dark:hover:bg-primary/10" onclick="loadSavedPlan(${idx})"><div class="flex-1 text-left w-full"><div class="font-semibold text-foreground-primary text-sm">Salvataggio del ${when}</div><p class="text-xs text-foreground-muted mt-1">${s.plan.length} esami · Sedi: ${sedi}</p></div><button class="btn btn-secondary !py-2 !px-4 !rounded-md w-full sm:w-auto" onclick="event.stopPropagation(); loadSavedPlan(${idx})">Visualizza</button></div>`;
+        out.innerHTML += `<div class="p-4 border border-border-color rounded-lg flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 transition-all duration-300 cursor-pointer hover:shadow-md hover:border-primary/30 dark:hover:border-primary/30 hover:bg-primary/5 dark:hover:bg-primary/10" onclick="loadSavedPlan(${idx})"><div class="flex-1 text-left w-full"><div class="font-semibold text-foreground-primary text-sm">Salvataggio del ${when}</div><p class="text-xs text-foreground-muted mt-1">${s.plan.length} esami · Sedi: ${sedi}</p></div><button class="btn btn-secondary !py-2 !px-4 !rounded-md w-full sm:w-auto mt-3 sm:mt-0" onclick="event.stopPropagation(); loadSavedPlan(${idx})">Visualizza</button></div>`;
       });
     }
     document.getElementById('clear-plans-btn')?.addEventListener('click',()=>{ if(window.confirm('Eliminare tutti i piani salvati?')){ localStorage.removeItem('examPlans'); displaySavedPlans(); }});
