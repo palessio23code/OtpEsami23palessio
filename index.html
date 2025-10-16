@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="it" class="">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ottimizzatore Piano Esami</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Force Tailwind's class-based dark mode
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --background: #f8fafc;
+      --foreground-primary: #020617;
+      --foreground-secondary: #334155;
+      --foreground-muted: #64748b;
+      --card-background: #ffffff;
+      --input-background: #ffffff;
+      --input-border: #cbd5e1;
+      --primary: #0e7490; /* Cyan-700 */
+      --primary-hover: #155e75; /* Cyan-800 */
+      --primary-foreground: #ffffff;
+      --accent-red: #ef4444;
+    }
+    html.dark {
+      --background: #020617;
+      --foreground-primary: #f8fafc;
+      --foreground-secondary: #cbd5e1;
+      --foreground-muted: #94a3b8;
+      --card-background: #0f172a;
+      --input-background: #1e293b;
+      --input-border: #334155;
+      --primary: #67e8f9; /* Lighter Cyan */
+      --primary-hover: #a5f3fc;
+      --primary-foreground: #020617;
+      --accent-red: #f87171;
+    }
+    html {
+      background-color: var(--background);
+    }
+    html.dark {
+      background-image: radial-gradient(circle at 1px 1px, rgba(203, 213, 225, 0.08) 1px, transparent 0);
+      background-size: 25px 25px;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: transparent; /* Body is transparent to let html background show through */
+      color: var(--foreground-secondary);
+      transition: background-color 0.3s, color 0.3s;
+    }
+    .card {
+        background-color: var(--card-background);
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+        border: 1px solid var(--input-border);
+        transition: all 0.3s ease-in-out;
+    }
+     .card:hover {
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -4px rgb(0 0 0 / 0.07);
+        border-color: var(--primary);
+    }
+    .input-base {
+        background-color: var(--input-background);
+        border: 1px solid var(--input-border);
+        color: var(--foreground-primary);
+    }
+    html.dark input[type="date"] {
+        color-scheme: dark;
+    }
+    html.dark select option {
+        background-color: var(--input-background);
+        color: var(--foreground-primary);
+    }
+    .btn-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1.5rem;
+        border-radius: 9999px;
+        background-image: linear-gradient(to right, var(--primary), #0d9488); /* Cyan to Teal */
+        color: var(--primary-foreground);
+        font-weight: 600;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 4px 15px -5px var(--primary);
+    }
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px -5px var(--primary);
+    }
+    .btn-primary:active {
+        transform: scale(0.98) translateY(0);
+    }
+    .btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        background-color: transparent;
+        color: var(--foreground-secondary);
+        font-weight: 500;
+        border: 1px solid var(--input-border);
+        transition: background-color 0.2s;
+    }
+    .btn-secondary:hover {
+         background-color: rgba(100,116,139, 0.1);
+    }
+
+    /* Custom Number Input */
+    .number-input-container { display: flex; align-items: center; }
+    .number-input-container button {
+        width: 2.5rem; height: 2.5rem;
+        background-color: var(--input-background);
+        border: 1px solid var(--input-border);
+        color: var(--foreground-muted);
+        transition: background-color 0.2s;
+    }
+    .number-input-container button:hover { background-color: rgba(100,116,139, 0.1); }
+    .number-input-container button:first-child { border-radius: 0.5rem 0 0 0.5rem; }
+    .number-input-container button:last-child { border-radius: 0 0.5rem 0.5rem 0; }
+    .number-input-container input {
+        text-align: center;
+        border-radius: 0;
+        -moz-appearance: textfield;
+    }
+    .number-input-container input::-webkit-outer-spin-button,
+    .number-input-container input::-webkit-inner-spin-button {
+        -webkit-appearance: none; margin: 0;
+    }
+    
+    /* Custom Select */
+    .custom-select-container { position: relative; }
+    .custom-select-container select { appearance: none; -webkit-appearance: none; }
+    .custom-select-container .chevron-icon {
+        position: absolute; right: 0.75rem; top: 50%;
+        transform: translateY(-50%);
+        pointer-events: none;
+        color: var(--foreground-muted);
+    }
+    
+    /* Custom Date Input */
+    .date-input-wrapper { position: relative; }
+    .date-input-wrapper .date-icon {
+      position: absolute;
+      left: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      color: var(--foreground-muted);
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      opacity: 0; /* Make it transparent but still clickable */
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+
+    /* Custom Calendar Icon */
+    .calendar-icon {
+      width: 4rem;
+      border: 1px solid var(--input-border);
+      border-radius: 0.5rem;
+      text-align: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .calendar-icon .month {
+      background-color: var(--accent-red);
+      color: white;
+      font-weight: bold;
+      font-size: 0.75rem;
+      padding: 2px 0;
+    }
+     .calendar-icon .day {
+      font-size: 1.5rem;
+      font-weight: bold;
+      padding: 0.25rem 0;
+      color: var(--foreground-primary);
+      background-color: var(--card-background);
+    }
+
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(1rem); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animated-entry {
+      opacity: 0;
+      animation: fadeInUp 0.5s ease-out forwards;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+    <header class="text-center mb-8 relative">
+      <h1 class="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-500 to-emerald-500 dark:from-cyan-400 dark:to-emerald-400">Ottimizzatore Piano Esami</h1>
+      <p class="text-slate-700 dark:text-slate-300 mt-2">Carica il tuo file JSON degli appelli e trova il piano ottimizzato.</p>
+       <div class="absolute top-0 right-0">
+          <button id="theme-toggle" class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 focus:ring-offset-background">
+              <svg id="theme-icon-light" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+              <svg id="theme-icon-dark" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+          </button>
+      </div>
+    </header>
+
+    <!-- Upload + Controls -->
+    <section class="card p-5 md:p-6 space-y-6 animated-entry">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div>
+                <label for="file-input" class="block text-sm font-medium mb-2">File appelli (.json)</label>
+                <div id="file-dropzone" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md transition-colors duration-300 border-slate-300 dark:border-slate-600 hover:border-cyan-500 dark:hover:border-cyan-400 cursor-pointer">
+                    <div class="space-y-1 text-center">
+                        <svg class="mx-auto h-12 w-12 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                           <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                        <div class="flex text-sm text-slate-600 dark:text-slate-400">
+                            <!-- MODIFICA: Cambiato da label a span per evitare doppi click -->
+                            <span class="relative cursor-pointer rounded-md font-medium text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-cyan-500">
+                                <span>Carica un file</span>
+                                <input id="file-input" name="file-input" type="file" class="sr-only" accept=".json">
+                            </span>
+                            <p class="pl-1">o trascinalo qui</p>
+                        </div>
+                        <p id="file-name" class="text-xs text-slate-500"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="custom-select-container">
+              <label for="free-sede-select" class="block text-sm font-medium mb-2">Sede gratuita (opzionale)</label>
+              <select id="free-sede-select"
+                class="w-full input-base rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400">
+                <option value="">Nessuna</option>
+                <option value="Villa Vannucchi">Villa Vannucchi</option>
+                <option value="Piazza Oderico da Pordenone">Piazza Oderico da Pordenone</option>
+                <option value="Altro">Altro...</option>
+              </select>
+               <svg class="chevron-icon w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+              <input id="free-sede-other" type="text" placeholder="Inserisci sede personalizzata"
+                class="hidden mt-2 w-full input-base rounded-lg p-2 focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400">
+              <p class="text-xs mt-1">Match tollerante: non serve scriverla identica al database.</p>
+            </div>
+      </div>
+      
+      <div class="border-t border-slate-200 dark:border-slate-700"></div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <label for="max-exams" class="block text-sm font-medium mb-1">Max esami totali</label>
+           <div class="number-input-container">
+                <button type="button" data-action="decrement" data-target="max-exams">-</button>
+                <input id="max-exams" type="number" value="10" min="1" class="w-full input-base p-2 h-10">
+                <button type="button" data-action="increment" data-target="max-exams">+</button>
+           </div>
+        </div>
+        <div>
+          <label for="max-per-day" class="block text-sm font-medium mb-1">Max esami per giorno</label>
+          <div class="number-input-container">
+                <button type="button" data-action="decrement" data-target="max-per-day">-</button>
+                <input id="max-per-day" type="number" value="2" min="1" class="w-full input-base p-2 h-10">
+                <button type="button" data-action="increment" data-target="max-per-day">+</button>
+           </div>
+        </div>
+        <div>
+          <label for="min-gap-days" class="block text-sm font-medium mb-1">Gap minimo (giorni)</label>
+          <div class="number-input-container">
+                <button type="button" data-action="decrement" data-target="min-gap-days">-</button>
+                <input id="min-gap-days" type="number" value="0" min="0" class="w-full input-base p-2 h-10">
+                <button type="button" data-action="increment" data-target="min-gap-days">+</button>
+           </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label for="min-date" class="block text-sm font-medium">Data inizio ricerca</label>
+            <button id="set-nov-2025" type="button" class="px-2 py-0.5 text-xs font-semibold text-cyan-800 bg-cyan-100 dark:bg-cyan-900 dark:text-cyan-200 rounded-full hover:bg-cyan-200 dark:hover:bg-cyan-800 transition-colors">
+                01 Nov 25
+            </button>
+          </div>
+          <div class="date-input-wrapper">
+             <svg class="date-icon w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0h18M-4.5 12h22.5" /></svg>
+             <input id="min-date" type="date" class="w-full input-base rounded-lg p-2 pl-10 focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 h-10">
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label for="max-date" class="block text-sm font-medium">Data massima</label>
+            <div class="custom-select-container relative">
+                <select id="quick-date-select" class="input-base rounded-lg pl-3 pr-8 py-1 text-sm focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 h-8 appearance-none bg-transparent">
+                    <option value="">Date rapide...</option>
+                    <option value="2026-01-31">31/01/2026</option>
+                    <option value="2026-02-28">28/02/2026</option>
+                    <option value="2026-03-31">31/03/2026</option>
+                    <option value="2026-04-30">30/04/2026</option>
+                    <option value="2026-05-31">31/05/2026</option>
+                    <option value="2026-06-30">30/06/2026</option>
+                    <option value="2026-07-31">31/07/2026</option>
+                </select>
+                <svg class="chevron-icon w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+            </div>
+          </div>
+          <div class="date-input-wrapper">
+            <svg class="date-icon w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0h18M-4.5 12h22.5" /></svg>
+            <input id="max-date" type="date" class="w-full input-base rounded-lg p-2 pl-10 focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 h-10">
+          </div>
+        </div>
+        <div>
+          <label for="max-sedi" class="block text-sm font-medium mb-1">Max sedi</label>
+          <div class="number-input-container">
+              <button type="button" data-action="decrement" data-target="max-sedi">-</button>
+              <input id="max-sedi" type="number" value="2" min="1" class="w-full input-base p-2 h-10">
+              <button type="button" data-action="increment" data-target="max-sedi">+</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="text-center pt-2">
+        <button id="run-btn" class="btn-primary !text-base group">
+             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="transition-transform duration-300 ease-in-out group-hover:scale-110" viewBox="0 0 16 16">
+                <path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/>
+             </svg>
+            Calcola Piano Ottimale
+        </button>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section id="results-container" class="mt-8 card p-5 md:p-6 hidden">
+      <div id="results-header" class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4">
+        <h2 class="text-xl font-bold">Piano Ottimizzato</h2>
+        <button id="save-plan-btn" class="btn-secondary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>
+            Salva Piano
+        </button>
+      </div>
+      <div id="results"></div>
+    </section>
+
+    <!-- Saved Plans -->
+    <section id="saved-plans-container" class="mt-8 card p-5 md:p-6 hidden">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold">Piani Salvati</h2>
+            <button id="clear-plans-btn" class="btn-secondary !text-red-500 hover:!bg-red-500/10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+                Pulisci
+            </button>
+        </div>
+        <div id="saved-plans" class="space-y-4"></div>
+    </section>
+  </div>
+  
+  <div id="toast" class="fixed bottom-5 right-5 bg-green-600 text-white py-2 px-5 rounded-lg shadow-lg opacity-0 transition-opacity duration-300 flex items-center gap-3">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="w-5 h-5" viewBox="0 0 16 16">
+        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+    </svg>
+    <span id="toast-message">Piano salvato con successo!</span>
+  </div>
+
+  <script>
+    // Global state
+    let currentPlan = [];
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- Theme Switcher ---
+        const themeToggle = document.getElementById('theme-toggle');
+        const lightIcon = document.getElementById('theme-icon-light');
+        const darkIcon = document.getElementById('theme-icon-dark');
+
+        const applyTheme = (theme) => {
+          if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+            lightIcon.classList.add('hidden');
+            darkIcon.classList.remove('hidden');
+          } else {
+            document.documentElement.classList.remove('dark');
+            lightIcon.classList.remove('hidden');
+            darkIcon.classList.add('hidden');
+          }
+        };
+        
+        themeToggle.addEventListener('click', () => {
+          const isDark = document.documentElement.classList.contains('dark');
+          const newTheme = isDark ? 'light' : 'dark';
+          localStorage.setItem('theme', newTheme);
+          applyTheme(newTheme);
+        });
+
+        // --- UI: Custom Number Inputs (FIXED) ---
+        document.querySelectorAll('[data-action="increment"], [data-action="decrement"]').forEach(button => {
+            button.addEventListener('click', () => {
+                const targetInput = document.getElementById(button.dataset.target);
+                if (targetInput) {
+                    const action = button.dataset.action;
+                    const step = Number(targetInput.step) || 1;
+                    let value = Number(targetInput.value);
+
+                    if (action === 'increment') {
+                        const max = targetInput.hasAttribute('max') ? Number(targetInput.max) : null;
+                        if (max === null || (value + step) <= max) {
+                           targetInput.value = value + step;
+                        }
+                    } else if (action === 'decrement') {
+                        const min = targetInput.hasAttribute('min') ? Number(targetInput.min) : null;
+                        if (min === null || (value - step) >= min) {
+                           targetInput.value = value - step;
+                        }
+                    }
+                }
+            });
+        });
+
+        // --- UI: Custom Date Picker Trigger ---
+        document.querySelectorAll('.date-input-wrapper').forEach(wrapper => {
+            const input = wrapper.querySelector('input[type="date"]');
+            if (input) {
+                wrapper.style.cursor = 'pointer';
+                wrapper.addEventListener('click', () => {
+                    try {
+                        input.showPicker();
+                    } catch (error) {
+                        console.error("showPicker() is not supported by this browser.", error);
+                    }
+                });
+            }
+        });
+
+        // --- UI: gestione select "Altro" ---
+        const sedeSelect = document.getElementById("free-sede-select");
+        const sedeOther = document.getElementById("free-sede-other");
+        sedeSelect.addEventListener("change", () => {
+          if (sedeSelect.value === "Altro") {
+            sedeOther.classList.remove("hidden");
+          } else {
+            sedeOther.classList.add("hidden");
+            sedeOther.value = "";
+          }
+        });
+        
+        // --- UI: File Dropzone ---
+        const dropzone = document.getElementById('file-dropzone');
+        const fileInput = document.getElementById('file-input');
+        const fileNameDisplay = document.getElementById('file-name');
+
+        // MODIFICA: Rende l'intera area cliccabile
+        dropzone.addEventListener('click', () => fileInput.click());
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('border-cyan-500', 'dark:border-cyan-400', 'bg-slate-50', 'dark:bg-slate-800/20');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('border-cyan-500', 'dark:border-cyan-400', 'bg-slate-50', 'dark:bg-slate-800/20');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('border-cyan-500', 'dark:border-cyan-400', 'bg-slate-50', 'dark:bg-slate-800/20');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                updateFileName(fileInput.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) {
+                updateFileName(fileInput.files[0]);
+            }
+        });
+
+        function updateFileName(file) {
+            fileNameDisplay.textContent = file ? file.name : '';
+        }
+
+        // --- UI: Quick Date Set ---
+        document.getElementById('set-nov-2025').addEventListener('click', () => {
+            document.getElementById('min-date').value = '2025-11-01';
+        });
+        
+        document.getElementById('quick-date-select').addEventListener('change', (e) => {
+            const date = e.target.value;
+            if (date) {
+                document.getElementById('max-date').value = date;
+            }
+        });
+
+
+        // Initial load logic
+        let initialTheme = localStorage.getItem('theme');
+        if (!initialTheme) {
+            initialTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        applyTheme(initialTheme);
+        displaySavedPlans();
+    });
+    
+    // --- Utils ---
+    function parseDateTimeIT(s) {
+      if (!s) return null;
+      const str = String(s).trim();
+      const re = /^(\d{2})[\/-](\d{2})[\/-](\d{4})(?:\s*(?:ore\s*)?(\d{2}):(\d{2}))?$/i;
+      const m = str.match(re);
+      if (!m) return null;
+      const [, dd, mm, yyyy, HH, MM] = m;
+      const d = new Date(`${yyyy}-${mm}-${dd}T${HH || '00'}:${MM || '00'}:00`);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const formatDate = d => d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const formatTime = d => d.toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
+    const prettySede = s => s ? s.replace(/^\s*Sede\s+/i, '').replace(/\s+/g, ' ').trim() : "";
+    function normalizeSede(s){
+      return s ? prettySede(s).replace(/[(),]/g," ").replace(/\s+/g," ").normalize("NFD")
+        .replace(/[\u0300-\u036f]/g,"").toLowerCase().trim() : "";
+    }
+    function sedeMatch(a,b){ const A=normalizeSede(a), B=normalizeSede(b); return A.includes(B)||B.includes(A); }
+
+    // --- Core optimizer ---
+    function optimize(allExams, params) {
+      let df = allExams
+        .map(e => ({...e, data_dt: parseDateTimeIT(e.data)}))
+        .filter(e => e.data_dt instanceof Date && !isNaN(e.data_dt))
+        .map(e => ({...e, sede_pretty: prettySede(e.sede), sede_clean: normalizeSede(e.sede), course: String(e.corso)}));
+
+      df = df.filter(e => {
+        const tipo = String(e.tipo||'').toUpperCase().trim();
+        const mod  = String(e.modalita||'').toLowerCase().trim();
+        if (!(tipo==='ONLINE' || mod.includes('online') || mod.includes('remoto'))) return false;
+        if (params.min_date && e.data_dt < new Date(params.min_date+'T00:00:00')) return false;
+        if (params.max_date && e.data_dt > new Date(params.max_date+'T23:59:59')) return false;
+        return true;
+      });
+
+      df.forEach(e => e.day = new Date(e.data_dt.getFullYear(), e.data_dt.getMonth(), e.data_dt.getDate()));
+
+      const totalUniqueCourses = new Set(df.map(e => e.course)).size;
+      if (!df.length) return { chosen: [], stats: { total_unique_courses: 0, planned_unique: 0, unplanned_courses: [], used_sedi: [], max_sedi: params.max_sedi, reached_max_sedi: false } };
+
+      let chosen = [];
+      const chosen_courses = new Set();
+
+      if (params.free_sede_exact) {
+        const free = df.filter(e => sedeMatch(e.sede, params.free_sede_exact)).sort((a,b)=>a.data_dt-b.data_dt);
+        const perDay = {};
+        for (const e of free) {
+          if (chosen.length >= params.max_exams) break;
+          if (chosen_courses.has(e.course)) continue;
+          const dayKey = e.day.getTime();
+          if ((perDay[dayKey] || 0) >= params.max_per_day) continue;
+          const tooClose = chosen.some(c => Math.abs((e.day - c.day)/86400000) < params.min_gap_days && (e.day - c.day) !== 0);
+          if (tooClose) continue;
+
+          chosen.push({ Corso:e.course, Data:formatDate(e.data_dt), Ora:formatTime(e.data_dt),
+                        Sede:e.sede_pretty, sede_clean:normalizeSede(e.sede),
+                        dt:e.data_dt, day:e.day, Chiusura:e.chiusura_prenotazioni||"" });
+          chosen_courses.add(e.course);
+          perDay[dayKey] = (perDay[dayKey]||0)+1;
+        }
+      }
+
+      const usedSedi = new Set(chosen.map(c => c.sede_clean));
+      let reachedMaxSedi = false;
+
+      while (chosen.length < params.max_exams) {
+        if (usedSedi.size >= params.max_sedi) { reachedMaxSedi = true; break; }
+
+        const candid = [...new Set(df.filter(e => !chosen_courses.has(e.course)).map(e => normalizeSede(e.sede)))].filter(s => !usedSedi.has(s));
+        if (!candid.length) break;
+
+        let bestSede=null, bestSet=[], bestLen=-1;
+        for (const sede of candid) {
+          const exams = df.filter(e => normalizeSede(e.sede) === sede && !chosen_courses.has(e.course)).sort((a,b)=>a.data_dt-b.data_dt);
+          const tmp=[], perDay={};
+          chosen.forEach(c => perDay[c.day.getTime()] = (perDay[c.day.getTime()]||0)+1);
+          for (const e of exams) {
+            if (chosen.length + tmp.length >= params.max_exams) break;
+            const dayKey = e.day.getTime();
+            if ((perDay[dayKey]||0) >= params.max_per_day) continue;
+            const tooClose = [...chosen, ...tmp].some(c => Math.abs((e.day - c.day)/86400000) < params.min_gap_days && (e.day - c.day) !== 0);
+            if (tooClose) continue;
+            tmp.push(e);
+            perDay[dayKey] = (perDay[dayKey]||0)+1;
+          }
+          if (tmp.length > bestLen) { bestLen = tmp.length; bestSede = sede; bestSet = tmp; }
+        }
+        if (!bestSede || !bestSet.length) break;
+
+        bestSet.forEach(e => {
+          chosen.push({ Corso:e.course, Data:formatDate(e.data_dt), Ora:formatTime(e.data_dt),
+                        Sede:e.sede_pretty, sede_clean:normalizeSede(e.sede),
+                        dt:e.data_dt, day:e.day, Chiusura:e.chiusura_prenotazioni||"" });
+          chosen_courses.add(e.course);
+        });
+        usedSedi.add(bestSede);
+      }
+
+      const plannedUnique = new Set(chosen.map(c => c.Corso)).size;
+      const unplannedCourses = [...new Set(df.map(e => e.course))].filter(c => !new Set(chosen.map(x => x.Corso)).has(c));
+
+      return {
+        chosen: chosen.map(c => ({...c, dt: c.dt.toISOString() })),
+        stats: {
+          total_unique_courses: totalUniqueCourses,
+          planned_unique: plannedUnique,
+          unplanned_courses: unplannedCourses,
+          used_sedi: [...usedSedi].map(s => s),
+          max_sedi: params.max_sedi,
+          reached_max_sedi: reachedMaxSedi
+        }
+      };
+    }
+    
+    // --- Google Calendar ---
+    function addToGoogleCalendar(exam) {
+        const examDate = new Date(exam.dt);
+        const startTime = examDate.toISOString().replace(/-|:|\.\d\d\d/g, "");
+        const endDate = new Date(examDate.getTime() + 60 * 60 * 1000).toISOString().replace(/-|:|\.\d\d\d/g, "");
+
+        const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Esame: ' + exam.Corso)}&dates=${startTime}/${endDate}&details=${encodeURIComponent('Esame di ' + exam.Corso)}&location=${encodeURIComponent(exam.Sede)}`;
+        window.open(url, '_blank');
+    }
+
+    // --- UI Display ---
+    function displayResults(payload) {
+        const out = document.getElementById("results");
+        const container = document.getElementById("results-container");
+
+        const res = !payload.chosen ? { chosen: payload, stats: {} } : (Array.isArray(payload) ? { chosen: payload, stats: { total_unique_courses: payload.length, planned_unique: payload.length, unplanned_courses: [], used_sedi: [...new Set(payload.map(x=>x.sede_clean))], max_sedi: Infinity, reached_max_sedi: false } } : payload);
+        
+        currentPlan = res.chosen.map(c => ({...c, dt: new Date(c.dt)}));
+        const stats = res.stats || { total_unique_courses: 0, planned_unique: 0, unplanned_courses: [], used_sedi: [], max_sedi: Infinity, reached_max_sedi: false };
+
+        if (!currentPlan.length) {
+            out.innerHTML = `<div class="rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/20 p-4 text-amber-800 dark:text-amber-300">
+            Nessun risultato con i vincoli correnti. Prova ad allargare l'intervallo date o aumentare il numero massimo di sedi/giorno.
+            </div>`;
+            container.classList.remove('hidden');
+            document.getElementById('save-plan-btn').classList.add('hidden');
+            return;
+        }
+      
+        document.getElementById('save-plan-btn').classList.remove('hidden');
+        container.classList.add('hidden'); // Hide to animate later
+        setTimeout(() => container.classList.remove('hidden'), 0);
+        container.classList.add('animated-entry');
+
+        let header = '';
+        if (stats.planned_unique && stats.planned_unique < stats.total_unique_courses) {
+            const missing = stats.total_unique_courses - stats.planned_unique;
+            header += `
+            <div class="rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/20 p-4 text-amber-800 dark:text-amber-300 mb-4">
+                <b>Avviso:</b> sono stati pianificati <b>${stats.planned_unique}</b> esami su <b>${stats.total_unique_courses}</b> disponibili nel periodo.
+                ${stats.reached_max_sedi ? ' Hai raggiunto il limite di sedi impostato.' : ''}
+                ${stats.unplanned_courses.length ? '<br>Non pianificati: ' + stats.unplanned_courses.map(s=>s.replace(/_/g,' ')).join(' · ') : ''}
+            </div>
+            `;
+        }
+      
+        const uniqueSedi = [...new Set(currentPlan.map(r => r.Sede))];
+        const groups = {};
+        currentPlan.forEach(r => {
+            const key = `${r.Data}`; // Group by day only
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(r);
+        });
+
+        let html = `${header}
+            <div class='mb-4 text-sm p-3 bg-slate-500/10 rounded-lg'>
+            Sedi utilizzate: <b>${uniqueSedi.length}</b> &mdash; ${uniqueSedi.join(" &middot; ")}
+            </div>`;
+
+        out.innerHTML = html; // Set header first
+
+        Object.keys(groups).sort((a,b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-'))).forEach(dateKey => {
+            const examsInGroup = groups[dateKey];
+            examsInGroup.sort((a, b) => a.dt - b.dt); 
+            
+            examsInGroup.forEach((e, index) => {
+                const examJson = JSON.stringify(e).replace(/"/g, '&quot;');
+                const examDate = e.dt;
+                const day = examDate.getDate();
+                const month = examDate.toLocaleDateString('it-IT', { month: 'short' }).toUpperCase().replace('.', '');
+                const closingDate = e.Chiusura ? parseDateTimeIT(e.Chiusura) : null;
+                let closingHtml = `<span class="text-slate-500 dark:text-slate-400">N/D</span>`;
+                if(closingDate){
+                    const isPast = closingDate < new Date();
+                    closingHtml = `<span class="font-semibold ${isPast ? 'text-red-500' : ''}">${e.Chiusura}</span>`;
+                }
+
+                const itemHtml = `
+                <div class="flex items-stretch gap-4 p-3 mb-2 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-cyan-400 dark:hover:border-cyan-600 transition-all duration-200 animated-entry" style="animation-delay: ${index * 75}ms">
+                    <div class="calendar-icon">
+                      <div class="month">${month}</div>
+                      <div class="day">${day}</div>
+                    </div>
+                    <div class="flex-grow">
+                        <p class="font-bold text-slate-800 dark:text-slate-100">${e.Corso.replace(/_/g, " ")}</p>
+                        <p class="text-sm">${e.Sede}</p>
+                        <p class="text-xs mt-1">
+                           <span class="font-semibold">Orario:</span> ${e.Ora}
+                           <span class="mx-2">|</span> 
+                           <span class="font-semibold">Chiusura:</span> ${closingHtml}
+                        </p>
+                    </div>
+                    <div class="flex flex-col justify-center items-center">
+                         <button onclick='addToGoogleCalendar(${examJson})' class='btn-secondary !py-1 !px-2 !text-xs'>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M8 7a.5.5 0 0 1 .5.5V9H10a.5.5 0 0 1 0 1H8.5v1.5a.5.5 0 0 1-1 0V10H6a.5.5 0 0 1 0-1h1.5V7.5A.5.5 0 0 1 8 7z"/><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/></svg>
+                            Calendario
+                        </button>
+                    </div>
+                </div>`;
+                out.innerHTML += itemHtml;
+            });
+        });
+    }
+    
+    // --- Plan Persistence ---
+    function showToast(message) {
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+        toastMessage.textContent = message;
+        toast.classList.remove('opacity-0');
+        setTimeout(() => {
+            toast.classList.add('opacity-0');
+        }, 2000);
+    }
+
+    function saveCurrentPlan() {
+        if (!currentPlan || currentPlan.length === 0) return;
+        const savedPlans = JSON.parse(localStorage.getItem('examPlans') || '[]');
+        savedPlans.unshift({
+            date: new Date().toISOString(),
+            plan: currentPlan.map(c => ({...c, dt: c.dt.toISOString() }))
+        });
+        localStorage.setItem('examPlans', JSON.stringify(savedPlans));
+        displaySavedPlans();
+        showToast('Piano salvato!');
+    }
+    
+    function loadSavedPlan(index) {
+        const savedPlans = JSON.parse(localStorage.getItem('examPlans') || '[]');
+        if(index >= savedPlans.length) return;
+        
+        const planToLoad = savedPlans[index];
+        displayResults({ chosen: planToLoad.plan, stats: {} });
+        document.getElementById('results-container').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function displaySavedPlans() {
+        const savedPlans = JSON.parse(localStorage.getItem('examPlans') || '[]');
+        const container = document.getElementById('saved-plans-container');
+        const out = document.getElementById('saved-plans');
+
+        if (savedPlans.length === 0) {
+            container.classList.add('hidden');
+            return;
+        }
+
+        container.classList.add('hidden'); // Hide to animate later
+        setTimeout(() => container.classList.remove('hidden'), 0);
+        container.classList.add('animated-entry');
+        
+        out.innerHTML = '';
+        savedPlans.forEach((saved, index) => {
+            const saveDate = new Date(saved.date);
+            const examCount = saved.plan.length;
+            const sedi = [...new Set(saved.plan.map(p => p.Sede))].join(', ');
+
+            const itemHtml = `
+                <div class="p-3 border border-slate-200 dark:border-slate-700 rounded-lg flex justify-between items-center animated-entry hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors" style="animation-delay: ${index * 75}ms">
+                    <div>
+                        <div class="font-semibold text-sm">Salvataggio del ${saveDate.toLocaleString('it-IT')}</div>
+                        <p class="text-xs text-slate-600 dark:text-slate-400">${examCount} esami · Sedi: ${sedi}</p>
+                    </div>
+                    <button onclick="loadSavedPlan(${index})" class="btn-secondary">Visualizza</button>
+                </div>
+            `;
+            out.innerHTML += itemHtml;
+        });
+    }
+
+    function clearSavedPlans() {
+        if(confirm("Sei sicuro di voler eliminare tutti i piani salvati?")) {
+            localStorage.removeItem('examPlans');
+            displaySavedPlans();
+        }
+    }
+
+
+    // --- Event Listeners ---
+    document.getElementById("run-btn").addEventListener("click", () => {
+      const fileEl = document.getElementById("file-input");
+      if (!fileEl.files.length) {
+          alert("Seleziona un file JSON!");
+          return;
+      }
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const json = JSON.parse(e.target.result);
+          let sedeVal = document.getElementById("free-sede-select").value;
+          if (sedeVal === "Altro") sedeVal = document.getElementById("free-sede-other").value.trim();
+          const params = {
+            max_exams: +document.getElementById("max-exams").value,
+            max_per_day: +document.getElementById("max-per-day").value,
+            min_gap_days: +document.getElementById("min-gap-days").value,
+            min_date: document.getElementById("min-date").value,
+            max_date: document.getElementById("max-date").value,
+            free_sede_exact: sedeVal,
+            max_sedi: +document.getElementById("max-sedi").value || Infinity
+          };
+          const res = optimize(json, params);
+          displayResults(res);
+        } catch(err) {
+          alert("Errore: il file non è un JSON valido o c'è un problema nell'elaborazione.");
+          console.error(err);
+        }
+      };
+      reader.readAsText(fileEl.files[0]);
+    });
+    
+    document.getElementById("save-plan-btn").addEventListener("click", saveCurrentPlan);
+    document.getElementById("clear-plans-btn").addEventListener("click", clearSavedPlans);
+
+  </script>
+</body>
+</html>
+
