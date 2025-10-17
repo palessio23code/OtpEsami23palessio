@@ -10,7 +10,7 @@
         darkMode: "class",
       };
     </script>
-    <link rel="icon" href="images/favicon.png" type="image/png">
+    <link rel="icon" href="images/favicon.png" type="image/png" />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
@@ -36,7 +36,8 @@
             Ottimizzatore Piano Esami
           </h1>
           <p class="text-foreground-secondary mt-2 max-w-xl mx-auto sm:mx-0">
-            Carica il tuo file JSON degli appelli e trova il piano di studi perfetto.
+            Carica il tuo file JSON degli appelli e trova il piano di studi
+            perfetto.
           </p>
         </div>
         <div>
@@ -266,7 +267,7 @@
               >
               <div class="relative">
                 <select id="quick-date-select-start" class="date-pill">
-                  <option value="">Rapide...</option>
+                  <option value="">Date Rapida...</option>
                   <option value="today">Oggi</option>
                   <option value="2025-11-01">01/11/25</option>
                 </select>
@@ -289,7 +290,7 @@
               >
               <div class="relative">
                 <select id="quick-date-select-end" class="date-pill">
-                  <option value="">Fine mese...</option>
+                  <option value="">Date Rapide...</option>
                   <option value="2025-12-31">Dicembre '25</option>
                   <option value="2026-01-31">Gennaio '26</option>
                   <option value="2026-02-28">Febbraio '26</option>
@@ -359,7 +360,7 @@
                 />
               </svg>
               <div>
-                <span class="font-semibold text-foreground-primary"
+                <span class="font-semibold text-foreground-primary text-left"
                   >Selezione manuale appelli</span
                 >
                 <p
@@ -372,7 +373,7 @@
             </div>
             <div class="flex items-center gap-3">
               <span id="manual-selection-badge" class="badge hidden"
-                >0 includi · 0 escludi</span
+                >0 incluse · 0 escluse</span
               >
               <svg
                 id="toggle-selection-icon"
@@ -463,12 +464,24 @@
                     <tr>
                       <th style="width: 80px">Includi</th>
                       <th style="width: 80px">Escludi</th>
-                      <th class="sortable-header cursor-pointer" data-sort="dt">Data<span class="sort-indicator"></span></th>
+                      <th class="sortable-header cursor-pointer" data-sort="dt">
+                        Data<span class="sort-indicator"></span>
+                      </th>
                       <th>Ora</th>
-                      <th class="sortable-header cursor-pointer" data-sort="corso">Corso<span class="sort-indicator"></span></th>
-                      <th class="sortable-header cursor-pointer" data-sort="sede">Sede<span class="sort-indicator"></span></th>
+                      <th
+                        class="sortable-header cursor-pointer"
+                        data-sort="corso"
+                      >
+                        Corso<span class="sort-indicator"></span>
+                      </th>
+                      <th
+                        class="sortable-header cursor-pointer"
+                        data-sort="sede"
+                      >
+                        Sede<span class="sort-indicator"></span>
+                      </th>
                     </tr>
-                     </thead>
+                  </thead>
                   <tbody id="exam-list"></tbody>
                 </table>
               </div>

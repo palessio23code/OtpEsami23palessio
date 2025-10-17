@@ -6,6 +6,7 @@
      * - Eliminati tutti i problemi di scrolling e posizionamento.
      * - Mantenuto l'avviso per esami non disponibili nel range di date.
     */
+    @import "tailwindcss";
     :root {
       --background: #f1f5f9;
       --foreground-primary: #1e293b;
