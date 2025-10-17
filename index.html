@@ -13,10 +13,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     /*
-     * v4.0 - Correzione Tocco Mobile
-     * - Aggiunta una regola CSS per disabilitare l'effetto :hover sulle card della tabella su mobile.
-     * - Questo impedisce che il colore cambi al tocco, risolvendo il problema di leggibilità.
-     * - Mantenuta la nuova UI del modale a pannello per mobile.
+     * v5.0 - Correzioni Stabilità
+     * - Aggiunto avviso per esami non disponibili nel range di date selezionato.
+     * - Risolto problema di scrolling e posizionamento del modale su desktop.
+     * - Mantenuto fix per tocco mobile e UI del modale.
     */
     :root {
       --background: #f1f5f9;
@@ -248,21 +248,26 @@
         transform: translateY(0);
     }
 
-    /* Stili Desktop: torna ad essere un riquadro centrato */
+    /* Stili Desktop: riquadro centrato e scrollabile */
     @media (min-width: 768px) {
+        /* ========= NUOVE REGOLE PER FIXARE POSIZIONAMENTO E SCROLL ========= */
         #manual-selection-modal.open {
             display: flex;
-            padding-top: 3rem;
-            justify-content: center;
+            align-items: center;       /* Centra verticalmente */
+            justify-content: center;   /* Centra orizzontalmente */
+            overflow-y: auto;          /* Abilita scroll se il modale è più alto dello schermo */
+            padding: 2rem;             /* Spazio dai bordi dello schermo */
         }
         #modal-content {
             position: relative;
+            bottom: auto;              /* Resetta lo stile mobile */
             max-width: 80rem;
+            width: 100%;
             transform: scale(0.95);
             border-radius: 1.25rem;
-            width: 100%;
             transition: transform 0.3s ease-out, opacity 0.3s ease-out;
             opacity: 0;
+            max-height: calc(100vh - 4rem); /* Limita l'altezza per far stare il padding */
         }
         #manual-selection-modal.open #modal-content {
             transform: scale(1);
@@ -441,9 +446,8 @@
         padding: 0.5rem;
         background: var(--input-bg);
       }
-      /* ======== NUOVA REGOLA PER FIXARE IL COLORE AL TOCCO ======== */
       .table tbody tr:hover {
-          background-color: var(--input-bg); /* Mantiene lo stesso colore di sfondo al tocco */
+          background-color: var(--input-bg);
       }
       .table td {
         text-align: right;
@@ -700,14 +704,14 @@
 
 
   <script>
-    // ===== Stato (LOGICA NON MODIFICATA) =====
+    // ===== Stato =====
     let currentPlan = [];
     let rawJson = [];
     let pickedInclude = new Set();
     let pickedExclude = new Set();
     let totalSediCount = 0;
 
-    // ===== Utils (LOGICA NON MODIFICATA) =====
+    // ===== Utils =====
     function parseDateTimeIT(s){ if(!s) return null; const m=String(s).trim().match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})(?:\s*(?:ore\s*)?(\d{2}):(\d{2}))?$/i); if(!m) return null; const[,dd,mm,yyyy,HH,MM]=m; const d=new Date(`${yyyy}-${mm}-${dd}T${HH||'00'}:${MM||'00'}:00`); return isNaN(d)?null:d; }
     const formatDate=d=>d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
     const formatTime=d=>d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
@@ -733,6 +737,9 @@
     });
     if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.classList.add('dark');
+        document.getElementById('theme-icon-light').classList.add('hidden'); // Icona sole nascosta
+        document.getElementById('theme-icon-dark').classList.remove('hidden'); // Icona luna visibile
+    } else {
         document.getElementById('theme-icon-light').classList.remove('hidden');
         document.getElementById('theme-icon-dark').classList.add('hidden');
     }
@@ -781,7 +788,7 @@
       if(e.target.value==='Altro') other.classList.remove('hidden'); else { other.classList.add('hidden'); other.value=''; }
     });
     
-    // ===== Dropzone (LOGICA NON MODIFICATA) =====
+    // ===== Dropzone =====
     const dropzone=document.getElementById('file-dropzone'), fileInput=document.getElementById('file-input'), fileNameDisplay=document.getElementById('file-name');
     dropzone.addEventListener('click',()=>fileInput.click());
     dropzone.addEventListener('dragover',e=>{ e.preventDefault(); dropzone.classList.add('border-primary','bg-primary/10'); });
@@ -806,7 +813,7 @@
       }; r.readAsText(f);
     }
 
-    // ===== Logica Modale (Aggiornata per la nuova UI) =====
+    // ===== Logica Modale =====
     const openModalBtn = document.getElementById('open-manual-modal-btn');
     const closeModalBtn = document.getElementById('close-manual-modal-btn');
     const confirmSelectionBtn = document.getElementById('confirm-selection-btn');
@@ -840,7 +847,7 @@
         }
     });
 
-    // ===== Ricerca / Tabella (LOGICA NON MODIFICATA) =====
+    // ===== Ricerca / Tabella =====
     const searchInput=document.getElementById('search-input');
     const showOnlyPicked=document.getElementById('show-only-picked');
     
@@ -936,7 +943,39 @@
     document.getElementById('select-all-exclude').addEventListener('click',()=>{ currentRows().forEach(r=>{ pickedExclude.add(r.id); pickedInclude.delete(r.id); }); buildExamList(); updateManualSelectionSummary(); });
     document.getElementById('unselect-all').addEventListener('click',()=>{ currentRows().forEach(r=>{ pickedExclude.delete(r.id); pickedInclude.delete(r.id); }); buildExamList(); updateManualSelectionSummary(); });
 
-    // ===== Optimizer (LOGICA NON MODIFICATA) =====
+    // ===== NUOVA FUNZIONE: Controllo Esami Disponibili =====
+    function checkUnavailableCourses(allExams, minDateStr, maxDateStr) {
+        if (!allExams || allExams.length === 0) return [];
+
+        const allCourses = [...new Set(allExams.map(e => String(e.corso)))];
+        if (allCourses.length === 0) return [];
+
+        const minDate = minDateStr ? new Date(minDateStr + 'T00:00:00') : null;
+        const maxDate = maxDateStr ? new Date(maxDateStr + 'T23:59:59') : null;
+
+        // Se non ci sono date, nessun corso può essere disponibile, quindi sono tutti non disponibili
+        if (!minDate && !maxDate) {
+            return []; // O forse `allCourses`? No, se non filtro per data, sono tutti disponibili.
+        }
+
+        const availableCourses = new Set();
+        for (const exam of allExams) {
+            const examDate = parseDateTimeIT(exam.data);
+            if (!examDate) continue;
+
+            const isAfterMin = !minDate || examDate >= minDate;
+            const isBeforeMax = !maxDate || examDate <= maxDate;
+
+            if (isAfterMin && isBeforeMax) {
+                availableCourses.add(String(exam.corso));
+            }
+        }
+        
+        const unavailableCourses = allCourses.filter(course => !availableCourses.has(course));
+        return unavailableCourses;
+    }
+
+    // ===== Optimizer =====
     function optimize(allExams, params){
       let df=allExams.map(e=>({...e, data_dt:parseDateTimeIT(e.data)})).filter(e=>e.data_dt instanceof Date && !isNaN(e.data_dt)).map(e=>({...e, sede_pretty:prettySede(e.sede), sede_clean:normalizeSede(e.sede), course:String(e.corso), id:examId(e)}));
       df=df.filter(e=>{ const tipo=String(e.tipo||'').toUpperCase().trim(); const mod=String(e.modalita||'').toLowerCase().trim(); if(!(tipo==='ONLINE'||mod.includes('online')||mod.includes('remoto'))) return false; if(params.min_date && e.data_dt < new Date(params.min_date+'T00:00:00')) return false; if(params.max_date && e.data_dt > new Date(params.max_date+'T23:59:59')) return false; return true; });
@@ -953,11 +992,11 @@
       return { chosen: chosen.map(c=>({...c, dt:c.dt.toISOString()})), stats:{ total_unique_courses: totalUniqueCourses, planned_unique: plannedUnique, unplanned_courses: unplannedCourses, used_sedi:[...usedSedi], max_sedi:params.max_sedi, reached_max_sedi:reachedMaxSedi, locked_not_scheduled:(locked_not_scheduled||[]).map(e=>({ corso:e.course, when:formatDate(e.data_dt)+' '+formatTime(e.data_dt), sede:e.sede_pretty })) } };
     }
 
-    // ===== Calendar (LOGICA NON MODIFICATA) =====
+    // ===== Calendar =====
     function computeManuallyExcludedCoursesForPeriod(){ const idsInPeriod=new Set(filteredRaw().map(e=>examId(e))); const excludedIds=[...pickedExclude].filter(id=>idsInPeriod.has(id)); const idToCourse=new Map(filteredRaw().map(e=>[examId(e), String(e.corso)])); const uniqueCourses=[...new Set(excludedIds.map(id=>idToCourse.get(id)))].filter(Boolean); return uniqueCourses; }
     function addToGoogleCalendar(exam){ const start=new Date(exam.dt).toISOString().replace(/-|:|\.\d\d\d/g,''); const end=new Date(new Date(exam.dt).getTime()+60*60*1000).toISOString().replace(/-|:|\.\d\d\d/g,''); const url=`https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Esame: '+exam.Corso)}&dates=${start}/${end}&details=${encodeURIComponent('Esame di '+exam.Corso)}&location=${encodeURIComponent(exam.Sede)}`; window.open(url,'_blank'); }
 
-    // ===== Output (LOGICA NON MODIFICATA) =====
+    // ===== Output (MODIFICATO)=====
     function displayResults(payload){
       const out=document.getElementById('results'), container=document.getElementById('results-container');
       const res=!payload.chosen?{chosen:payload,stats:{}}:(Array.isArray(payload)?{chosen:payload,stats:{total_unique_courses:payload.length,planned_unique:payload.length,unplanned_courses:[],used_sedi:[...new Set(payload.map(x=>x.sede_clean))],max_sedi:Infinity,reached_max_sedi:false,locked_not_scheduled:[]}}:payload);
@@ -966,13 +1005,25 @@
       container.classList.remove('hidden');
       container.classList.add('fade-in-up');
       out.innerHTML = ''; // Pulisci i risultati precedenti
+      
+      let headerHTML = '';
+      
+      // NUOVO BLOCCO: Avviso esami non disponibili nel periodo
+      const unavailableCourses = res.unavailable_courses || [];
+      if (unavailableCourses.length > 0) {
+          headerHTML += `<div class="rounded-lg border border-orange-400 bg-orange-50 dark:bg-orange-900/20 p-3 text-orange-700 dark:text-orange-300 mb-3"><b>Nessun appello nel periodo:</b> ${unavailableCourses.map(s => s.replace(/_/g, ' ')).join(' &middot; ')}</div>`;
+      }
 
-      if(!currentPlan.length){ out.innerHTML=`<div class="rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/20 p-4 text-amber-800 dark:text-amber-300">Nessun risultato con i vincoli correnti.</div>`; document.getElementById('save-plan-btn').classList.add('hidden'); return; }
+      if(!currentPlan.length){ 
+          out.innerHTML = headerHTML + `<div class="rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/20 p-4 text-amber-800 dark:text-amber-300">Nessun piano trovato con i vincoli correnti.</div>`; 
+          document.getElementById('save-plan-btn').classList.add('hidden'); 
+          return; 
+      }
       document.getElementById('save-plan-btn').classList.remove('hidden');
       
-      let headerHTML=''; const manuallyExcludedCourses=computeManuallyExcludedCoursesForPeriod();
-      if(manuallyExcludedCourses.length){ headerHTML+=`<div class="rounded-lg border border-blue-400 bg-blue-50 dark:bg-blue-900/20 p-3 text-blue-700 dark:text-blue-200 mb-3"><b>Esami esclusi manualmente</b>: ${manuallyExcludedCourses.map(s=>s.replace(/_/g,' ')).join(' · ')}</div>`; }
-      if(stats.unplanned_courses?.length){ headerHTML+=`<div class="rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 text-amber-800 dark:text-amber-300 mb-3"><b>Esami non pianificati</b>: ${stats.unplanned_courses.map(s=>s.replace(/_/g,' ')).join(' · ')}</div>`; }
+      const manuallyExcludedCourses=computeManuallyExcludedCoursesForPeriod();
+      if(manuallyExcludedCourses.length){ headerHTML+=`<div class="rounded-lg border border-blue-400 bg-blue-50 dark:bg-blue-900/20 p-3 text-blue-700 dark:text-blue-200 mb-3"><b>Esclusi manualmente</b>: ${manuallyExcludedCourses.map(s=>s.replace(/_/g,' ')).join(' · ')}</div>`; }
+      if(stats.unplanned_courses?.length){ headerHTML+=`<div class="rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 text-amber-800 dark:text-amber-300 mb-3"><b>Non pianificati</b>: ${stats.unplanned_courses.map(s=>s.replace(/_/g,' ')).join(' · ')}</div>`; }
       if(stats.locked_not_scheduled?.length){ headerHTML+=`<div class="rounded-lg border border-red-400 bg-red-50 dark:bg-red-900/20 p-3 text-red-700 dark:text-red-300 mb-3"><b>"Includi" non inseriti per conflitti</b>: <ul class="list-disc ml-5 text-sm mt-1">${stats.locked_not_scheduled.map(x=>`<li>${x.corso.replace(/_/g,' ')} — ${x.when}</li>`).join('')}</ul></div>`; }
       
       const uniqueSedi=[...new Set(currentPlan.map(r=>r.Sede))]; const groups={}; 
@@ -991,7 +1042,7 @@
       out.innerHTML = resultsHTML;
     }
 
-    // ===== Persistenza piani (LOGICA NON MODIFICATA) =====
+    // ===== Persistenza piani =====
     document.getElementById('save-plan-btn')?.addEventListener('click',()=>{
       if(!currentPlan.length) return;
       const saved=JSON.parse(localStorage.getItem('examPlans')||'[]');
@@ -1019,26 +1070,30 @@
     document.getElementById('clear-plans-btn')?.addEventListener('click',()=>{ if(window.confirm('Eliminare tutti i piani salvati?')){ localStorage.removeItem('examPlans'); displaySavedPlans(); }});
     displaySavedPlans();
 
-    // ===== Run (LOGICA NON MODIFICATA) =====
+    // ===== Run (MODIFICATO) =====
     document.getElementById('run-btn').addEventListener('click',()=>{
       if(!rawJson.length){ showToast('Seleziona prima un file JSON!', 'error'); return; }
       let sedeVal=document.getElementById('free-sede-select').value; if(sedeVal==='Altro') sedeVal=document.getElementById('free-sede-other').value.trim();
       const params={ max_exams:+document.getElementById('max-exams').value, max_per_day:+document.getElementById('max-per-day').value, min_gap_days:+document.getElementById('min-gap-days').value, min_date:document.getElementById('min-date').value, max_date:document.getElementById('max-date').value, free_sede_exact:sedeVal, max_sedi:+document.getElementById('max-sedi').value || Infinity, locked_ids:[...pickedInclude], excluded_ids:[...pickedExclude] };
+      
+      // Aggiunta chiamata alla nuova funzione
+      const unavailable = checkUnavailableCourses(rawJson, params.min_date, params.max_date);
+      
       const res=optimize(rawJson, params);
+      res.unavailable_courses = unavailable; // Aggiungo l'informazione ai risultati
+      
       displayResults(res);
       document.getElementById('results-container').scrollIntoView({behavior:'smooth'});
     });
     
-    // ===== Custom Select (LOGICA NON MODIFICATA) =====
+    // ===== Custom Select =====
     function setupCustomSelects() {
         document.querySelectorAll('select').forEach(selectElement => {
+            if (selectElement.parentNode.classList.contains('custom-select-container')) {
+                return; // Già inizializzato
+            }
             const container = document.createElement('div');
             container.className = 'custom-select-container';
-
-            const parent = selectElement.parentNode;
-            if (parent.classList.contains('custom-select-container')) {
-                 parent.parentNode.replaceChild(selectElement, parent);
-            }
             selectElement.parentNode.replaceChild(container, selectElement);
             container.appendChild(selectElement);
             
