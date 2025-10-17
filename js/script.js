@@ -1,4 +1,4 @@
- // ===== Stato =====
+// ===== Stato =====
     let currentPlan = [];
     let rawJson = [];
     let pickedInclude = new Set();
@@ -183,7 +183,6 @@
                 if (isChecked) {
                     pickedInclude.add(id);
                     pickedExclude.delete(id);
-                    // Ora usiamo un selettore più generico perché il modale non c'è più
                     const excludeCheckbox = document.querySelector(`input[data-id="${id}"][data-action="exclude"]`);
                     if (excludeCheckbox) excludeCheckbox.checked = false;
                 } else {
@@ -222,157 +221,188 @@
     document.getElementById('select-all-exclude').addEventListener('click',()=>{ currentRows().forEach(r=>{ pickedExclude.add(r.id); pickedInclude.delete(r.id); }); buildExamList(); updateManualSelectionSummary(); });
     document.getElementById('unselect-all').addEventListener('click',()=>{ currentRows().forEach(r=>{ pickedExclude.delete(r.id); pickedInclude.delete(r.id); }); buildExamList(); updateManualSelectionSummary(); });
 
-    // ===== FUNZIONE: Controllo Esami Disponibili =====
     function checkUnavailableCourses(allExams, minDateStr, maxDateStr) {
         if (!allExams || allExams.length === 0) return [];
-
         const allCourses = [...new Set(allExams.map(e => String(e.corso)))];
         if (allCourses.length === 0) return [];
-
         const minDate = minDateStr ? new Date(minDateStr + 'T00:00:00') : null;
         const maxDate = maxDateStr ? new Date(maxDateStr + 'T23:59:59') : null;
-
         if (!minDate && !maxDate) return [];
-
         const availableCourses = new Set();
         for (const exam of allExams) {
             const examDate = parseDateTimeIT(exam.data);
             if (!examDate) continue;
-
             const isAfterMin = !minDate || examDate >= minDate;
             const isBeforeMax = !maxDate || examDate <= maxDate;
-
             if (isAfterMin && isBeforeMax) {
                 availableCourses.add(String(exam.corso));
             }
         }
+        return allCourses.filter(course => !availableCourses.has(course));
+    }
+
+    function optimize(allExams, params) {
+        let df = allExams.map(e => ({ ...e, data_dt: parseDateTimeIT(e.data) }))
+            .filter(e => e.data_dt instanceof Date && !isNaN(e.data_dt))
+            .map(e => ({ ...e, sede_pretty: prettySede(e.sede), sede_clean: normalizeSede(e.sede), course: String(e.corso), id: examId(e) }));
         
-        const unavailableCourses = allCourses.filter(course => !availableCourses.has(course));
-        return unavailableCourses;
+        df = df.filter(e => {
+            const tipo = String(e.tipo || '').toUpperCase().trim();
+            const mod = String(e.modalita || '').toLowerCase().trim();
+            if (!(tipo === 'ONLINE' || mod.includes('online') || mod.includes('remoto'))) return false;
+            if (params.min_date && e.data_dt < new Date(params.min_date + 'T00:00:00')) return false;
+            if (params.max_date && e.data_dt > new Date(params.max_date + 'T23:59:59')) return false;
+            return true;
+        });
+
+        if (params.excluded_ids?.length) {
+            const ex = new Set(params.excluded_ids);
+            df = df.filter(e => !ex.has(e.id));
+        }
+        df.forEach(e => e.day = new Date(e.data_dt.getFullYear(), e.data_dt.getMonth(), e.data_dt.getDate()));
+        
+        const totalUniqueCourses = new Set(df.map(e => e.course)).size;
+        if (!df.length) return { chosen: [], stats: { total_unique_courses: 0, planned_unique: 0, unplanned_courses: [], used_sedi: [], max_sedi: params.max_sedi, reached_max_sedi: false, locked_not_scheduled: [] } };
+
+        // ===================================================================
+        // LOGICA DI OTTIMIZZAZIONE RIVISTA - v3
+        // 1. Inserisce esami bloccati.
+        // 2. Simula un piano per ogni sede (inclusa la gratuita) per trovare la migliore sede di partenza.
+        // 3. Costruisce il piano partendo dalla sede migliore.
+        // 4. Riempie gli slot rimanenti con altre sedi ottimali.
+        // ===================================================================
+
+        let initialPlan = [], initialCourses = new Set(), initialSedi = new Set(), initialPerDay = {}, locked_not_scheduled = [];
+        
+        // --- 1. GESTIONE ESAMI BLOCCATI (INCLUSI MANUALMENTE) ---
+        if (params.locked_ids?.length) {
+            const locked = df.filter(e => params.locked_ids.includes(e.id)).sort((a, b) => a.data_dt - b.data_dt);
+            for (const e of locked) {
+                if (initialPlan.length >= params.max_exams) break;
+                const dayKey = e.day.getTime();
+                if ((initialPerDay[dayKey] || 0) >= params.max_per_day) { locked_not_scheduled.push(e); continue; }
+                const tooClose = initialPlan.some(c => Math.abs((e.day - c.day) / 86400000) < params.min_gap_days && (e.day - c.day) !== 0);
+                if (tooClose) { locked_not_scheduled.push(e); continue; }
+                if (initialSedi.size >= params.max_sedi && !initialSedi.has(e.sede_clean)) { locked_not_scheduled.push(e); continue; }
+                
+                initialPlan.push(e);
+                initialCourses.add(e.course);
+                initialSedi.add(e.sede_clean);
+                initialPerDay[dayKey] = (initialPerDay[dayKey] || 0) + 1;
+            }
+        }
+        
+        let bestStartingPlan = { chosen: [...initialPlan], courses: new Set(initialCourses), sedi: new Set(initialSedi), perDay: { ...initialPerDay } };
+        
+        // --- 2. TROVA LA MIGLIORE SEDE DI PARTENZA ---
+        if (initialPlan.length < params.max_exams && initialSedi.size < params.max_sedi) {
+            let bestSedeOption = { sede: null, plan: [], score: -1 };
+            const candidateSedi = new Set(df.map(e => e.sede_clean));
+            const freeSedeClean = params.free_sede_exact ? normalizeSede(params.free_sede_exact) : null;
+
+            for (const sede of candidateSedi) {
+                if (initialSedi.has(sede)) continue;
+
+                let tempPlan = [...initialPlan];
+                let tempCourses = new Set(initialCourses);
+                let tempPerDay = { ...initialPerDay };
+                
+                const examsFromSede = df.filter(e => e.sede_clean === sede && !tempCourses.has(e.course)).sort((a, b) => a.data_dt - b.data_dt);
+
+                for (const exam of examsFromSede) {
+                    if (tempPlan.length >= params.max_exams) break;
+                    const dayKey = exam.day.getTime();
+                    if ((tempPerDay[dayKey] || 0) >= params.max_per_day) continue;
+                    const tooClose = tempPlan.some(c => Math.abs((exam.day - c.day) / 86400000) < params.min_gap_days && (exam.day - c.day) !== 0);
+                    if (tooClose) continue;
+
+                    tempPlan.push(exam);
+                    tempCourses.add(exam.course);
+                    tempPerDay[dayKey] = (tempPerDay[dayKey] || 0) + 1;
+                }
+
+                let score = tempPlan.length - initialPlan.length;
+                if (sede === freeSedeClean) score += 0.5; // Bonus per la sede gratuita in caso di parità
+
+                if (score > bestSedeOption.score) {
+                    bestSedeOption = { sede, plan: tempPlan, score };
+                }
+            }
+            
+            if (bestSedeOption.sede) {
+                 bestStartingPlan.chosen = bestSedeOption.plan;
+                 bestStartingPlan.sedi = new Set(bestSedeOption.plan.map(e => e.sede_clean));
+                 bestStartingPlan.courses = new Set(bestSedeOption.plan.map(e => e.course));
+                 bestStartingPlan.perDay = {};
+                 bestSedeOption.plan.forEach(e => {
+                     const dayKey = e.day.getTime();
+                     bestStartingPlan.perDay[dayKey] = (bestStartingPlan.perDay[dayKey] || 0) + 1;
+                 });
+            }
+        }
+        
+        let chosen = bestStartingPlan.chosen;
+        let chosen_courses = bestStartingPlan.courses;
+        let usedSedi = bestStartingPlan.sedi;
+        let perDay = bestStartingPlan.perDay;
+        let reachedMaxSedi = false;
+
+        // --- 4. RIEMPIE GLI SLOT RIMANENTI ---
+        while (chosen.length < params.max_exams) {
+            if (usedSedi.size >= params.max_sedi) { reachedMaxSedi = true; break; }
+            
+            const candidSedi = [...new Set(df.filter(e => !chosen_courses.has(e.course)).map(e => e.sede_clean))].filter(s => !usedSedi.has(s));
+            if (!candidSedi.length) break;
+
+            let bestNextSede = { sede: null, plan_additions: [], score: -1 };
+            for (const sede of candidSedi) {
+                let tempPlanAdditions = [];
+                let tempCourses = new Set(chosen_courses);
+                let tempPerDay = { ...perDay };
+
+                const examsFromSede = df.filter(e => e.sede_clean === sede && !tempCourses.has(e.course)).sort((a, b) => a.data_dt - b.data_dt);
+
+                for (const exam of examsFromSede) {
+                    if (chosen.length + tempPlanAdditions.length >= params.max_exams) break;
+                    if (tempCourses.has(exam.course)) continue;
+
+                    const dayKey = exam.day.getTime();
+                    if ((tempPerDay[dayKey] || 0) >= params.max_per_day) continue;
+                    const tooClose = [...chosen, ...tempPlanAdditions].some(c => Math.abs((exam.day - c.day) / 86400000) < params.min_gap_days && (exam.day - c.day) !== 0);
+                    if (tooClose) continue;
+
+                    tempPlanAdditions.push(exam);
+                    tempCourses.add(exam.course);
+                    tempPerDay[dayKey] = (tempPerDay[dayKey] || 0) + 1;
+                }
+                
+                if (tempPlanAdditions.length > bestNextSede.score) {
+                    bestNextSede = { sede, plan_additions: tempPlanAdditions, score: tempPlanAdditions.length };
+                }
+            }
+            
+            if (!bestNextSede.sede || bestNextSede.plan_additions.length === 0) break;
+
+            bestNextSede.plan_additions.forEach(e => chosen.push(e));
+            usedSedi.add(bestNextSede.sede);
+            chosen_courses = new Set(chosen.map(c => c.course));
+            perDay = {};
+            chosen.forEach(e => {
+                const dayKey = e.day.getTime();
+                perDay[dayKey] = (perDay[dayKey] || 0) + 1;
+            });
+        }
+        
+        const finalPlan = chosen.map(e => ({ Corso: e.course, Data: formatDate(e.data_dt), Ora: formatTime(e.data_dt), Sede: e.sede_pretty, sede_clean: e.sede_clean, dt: e.data_dt, day: e.day, Chiusura: e.chiusura_prenotazioni || "" }));
+        const plannedUnique = new Set(finalPlan.map(c => c.Corso)).size;
+        const unplannedCourses = [...new Set(df.map(e => e.course))].filter(c => !new Set(finalPlan.map(x => x.Corso)).has(c));
+        
+        return {
+            chosen: finalPlan.map(c => ({ ...c, dt: c.dt.toISOString() })),
+            stats: { total_unique_courses: totalUniqueCourses, planned_unique: plannedUnique, unplanned_courses: unplannedCourses, used_sedi: [...usedSedi], max_sedi: params.max_sedi, reached_max_sedi: reachedMaxSedi, locked_not_scheduled: (locked_not_scheduled || []).map(e => ({ corso: e.course, when: formatDate(e.data_dt) + ' ' + formatTime(e.data_dt), sede: e.sede_pretty })) }
+        };
     }
 
-    // ===== Optimizer =====
-    function optimize(allExams, params){
-      let df=allExams.map(e=>({...e, data_dt:parseDateTimeIT(e.data)})).filter(e=>e.data_dt instanceof Date && !isNaN(e.data_dt)).map(e=>({...e, sede_pretty:prettySede(e.sede), sede_clean:normalizeSede(e.sede), course:String(e.corso), id:examId(e)}));
-      df=df.filter(e=>{ const tipo=String(e.tipo||'').toUpperCase().trim(); const mod=String(e.modalita||'').toLowerCase().trim(); if(!(tipo==='ONLINE'||mod.includes('online')||mod.includes('remoto'))) return false; if(params.min_date && e.data_dt < new Date(params.min_date+'T00:00:00')) return false; if(params.max_date && e.data_dt > new Date(params.max_date+'T23:59:59')) return false; return true; });
-      if(params.excluded_ids?.length){ const ex=new Set(params.excluded_ids); df=df.filter(e=>!ex.has(e.id)); }
-      df.forEach(e=>e.day=new Date(e.data_dt.getFullYear(), e.data_dt.getMonth(), e.data_dt.getDate()));
-      const totalUniqueCourses=new Set(df.map(e=>e.course)).size;
-      if(!df.length) return { chosen:[], stats:{ total_unique_courses:0, planned_unique:0, unplanned_courses:[], used_sedi:[], max_sedi:params.max_sedi, reached_max_sedi:false, locked_not_scheduled:[] } };
-      
-      // ===================================================================
-      // NUOVA LOGICA DI OTTIMIZZAZIONE - 2024
-      // Priorità:
-      // 1. Esami bloccati manualmente ("Includi").
-      // 2. Saturazione delle sedi già in uso (quelle degli esami bloccati + sede gratuita).
-      // 3. Aggiunta di nuove sedi ottimali (se c'è ancora spazio).
-      // ===================================================================
-
-      let chosen = [], chosen_courses = new Set(), usedSedi = new Set(), perDay = {}, locked_not_scheduled = [];
-      let reachedMaxSedi = false;
-
-      // --- 1. GESTIONE ESAMI BLOCCATI (INCLUSI MANUALMENTE) ---
-      if (params.locked_ids?.length) {
-          const locked = df.filter(e => params.locked_ids.includes(e.id)).sort((a, b) => a.data_dt - b.data_dt);
-          for (const e of locked) {
-              if (chosen.length >= params.max_exams) break;
-              const dayKey = e.day.getTime();
-              
-              if ((perDay[dayKey] || 0) >= params.max_per_day) { locked_not_scheduled.push(e); continue; }
-              const tooClose = chosen.some(c => Math.abs((e.day - c.day) / 86400000) < params.min_gap_days && (e.day - c.day) !== 0);
-              if (tooClose) { locked_not_scheduled.push(e); continue; }
-              
-              if (usedSedi.size >= params.max_sedi && !usedSedi.has(e.sede_clean)) { locked_not_scheduled.push(e); continue; }
-              
-              chosen.push({ Corso: e.course, Data: formatDate(e.data_dt), Ora: formatTime(e.data_dt), Sede: e.sede_pretty, sede_clean: e.sede_clean, dt: e.data_dt, day: e.day, Chiusura: e.chiusura_prenotazioni || "" });
-              chosen_courses.add(e.course);
-              usedSedi.add(e.sede_clean);
-              perDay[dayKey] = (perDay[dayKey] || 0) + 1;
-          }
-      }
-
-      // --- 2. SATURAZIONE SEDI PRIORITARIE (già in uso + gratuita) ---
-      let prioritizedSedi = new Set(usedSedi);
-      if (params.free_sede_exact) {
-          prioritizedSedi.add(normalizeSede(params.free_sede_exact));
-      }
-
-      if (prioritizedSedi.size > 0 && chosen.length < params.max_exams) {
-          const candidates = df.filter(e => 
-              prioritizedSedi.has(e.sede_clean) && 
-              !chosen_courses.has(e.course) && 
-              !(params.excluded_ids || []).includes(e.id)
-          ).sort((a, b) => a.data_dt - b.data_dt);
-
-          for (const e of candidates) {
-              if (chosen.length >= params.max_exams) break;
-              if (chosen_courses.has(e.course)) continue;
-              
-              const dayKey = e.day.getTime();
-              if ((perDay[dayKey] || 0) >= params.max_per_day) continue;
-              
-              const tooClose = chosen.some(c => Math.abs((e.day - c.day) / 86400000) < params.min_gap_days && (e.day - c.day) !== 0);
-              if (tooClose) continue;
-
-              // Non serve controllare il limite sedi qui, perché stiamo usando solo quelle già ammesse
-              if (!usedSedi.has(e.sede_clean) && usedSedi.size >= params.max_sedi) continue;
-
-              chosen.push({ Corso: e.course, Data: formatDate(e.data_dt), Ora: formatTime(e.data_dt), Sede: e.sede_pretty, sede_clean: e.sede_clean, dt: e.data_dt, day: e.day, Chiusura: e.chiusura_prenotazioni || "" });
-              chosen_courses.add(e.course);
-              usedSedi.add(e.sede_clean); // Aggiunge la sede gratuita se non era già presente
-              perDay[dayKey] = (perDay[dayKey] || 0) + 1;
-          }
-      }
-
-      // --- 3. RICERCA DI NUOVE SEDI OTTIMALI (se c'è ancora spazio) ---
-      while (chosen.length < params.max_exams) {
-          if (usedSedi.size >= params.max_sedi) {
-              reachedMaxSedi = true;
-              break; 
-          }
-          
-          const candidSedi = [...new Set(df.filter(e => !chosen_courses.has(e.course) && !(params.excluded_ids || []).includes(e.id)).map(e => e.sede_clean))].filter(s => !usedSedi.has(s));
-          if (!candidSedi.length) break;
-
-          let bestSede = null, bestSet = [], bestLen = -1;
-          for (const sede of candidSedi) {
-              const examsFromSede = df.filter(e => e.sede_clean === sede && !chosen_courses.has(e.course)).sort((a, b) => a.data_dt - b.data_dt);
-              
-              const tempPlan = [], tempPerDay = { ...perDay };
-              for (const e of examsFromSede) {
-                  if (chosen.length + tempPlan.length >= params.max_exams) break;
-                  
-                  const dayKey = e.day.getTime();
-                  if ((tempPerDay[dayKey] || 0) >= params.max_per_day) continue;
-                  
-                  const tooClose = [...chosen, ...tempPlan].some(c => Math.abs((e.day - c.day) / 86400000) < params.min_gap_days && (e.day - c.day) !== 0);
-                  if (tooClose) continue;
-                  
-                  tempPlan.push(e);
-                  tempPerDay[dayKey] = (tempPerDay[dayKey] || 0) + 1;
-              }
-              
-              if (tempPlan.length > bestLen) {
-                  bestLen = tempPlan.length;
-                  bestSede = sede;
-                  bestSet = tempPlan;
-              }
-          }
-          
-          if (!bestSede || !bestSet.length) break;
-
-          bestSet.forEach(e => {
-              chosen.push({ Corso: e.course, Data: formatDate(e.data_dt), Ora: formatTime(e.data_dt), Sede: e.sede_pretty, sede_clean: e.sede_clean, dt: e.data_dt, day: e.day, Chiusura: e.chiusura_prenotazioni || "" });
-              chosen_courses.add(e.course);
-              const k = e.day.getTime();
-              perDay[k] = (perDay[k] || 0) + 1;
-          });
-          usedSedi.add(bestSede);
-      }
-      
-      const plannedUnique=new Set(chosen.map(c=>c.Corso)).size; const unplannedCourses=[...new Set(df.map(e=>e.course))].filter(c=>!new Set(chosen.map(x=>x.Corso)).has(c));
-      return { chosen: chosen.map(c=>({...c, dt:c.dt.toISOString()})), stats:{ total_unique_courses: totalUniqueCourses, planned_unique: plannedUnique, unplanned_courses: unplannedCourses, used_sedi:[...usedSedi], max_sedi:params.max_sedi, reached_max_sedi:reachedMaxSedi, locked_not_scheduled:(locked_not_scheduled||[]).map(e=>({ corso:e.course, when:formatDate(e.data_dt)+' '+formatTime(e.data_dt), sede:e.sede_pretty })) } };
-    }
 
     // ===== Calendar =====
     function computeManuallyExcludedCoursesForPeriod(){ const idsInPeriod=new Set(filteredRaw().map(e=>examId(e))); const excludedIds=[...pickedExclude].filter(id=>idsInPeriod.has(id)); const idToCourse=new Map(filteredRaw().map(e=>[examId(e), String(e.corso)])); const uniqueCourses=[...new Set(excludedIds.map(id=>idToCourse.get(id)))].filter(Boolean); return uniqueCourses; }
