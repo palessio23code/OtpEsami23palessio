@@ -13,10 +13,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     /*
-     * v5.0 - Correzioni Stabilità
-     * - Aggiunto avviso per esami non disponibili nel range di date selezionato.
-     * - Risolto problema di scrolling e posizionamento del modale su desktop.
-     * - Mantenuto fix per tocco mobile e UI del modale.
+     * v6.0 - UI Stabilità e Accordion
+     * - RIMOZIONE COMPLETA del componente modale (popup).
+     * - SOSTITUZIONE con una sezione a comparsa (accordion) più stabile e semplice.
+     * - Il click sul pulsante "Selezione manuale" ora mostra/nasconde una sezione sottostante.
+     * - Eliminati tutti i problemi di scrolling e posizionamento.
+     * - Mantenuto l'avviso per esami non disponibili nel range di date.
     */
     :root {
       --background: #f1f5f9;
@@ -62,10 +64,6 @@
       animation: fadeIn 0.5s ease-out forwards;
       overflow-x: hidden;
       min-height: 100vh;
-    }
-    
-    body.modal-open {
-        overflow: hidden;
     }
 
     /* Sfondo Animato */
@@ -209,79 +207,6 @@
         animation: gradient-animation 5s ease infinite;
     }
     
-    /* Stili Modale */
-    #manual-selection-modal {
-        position: fixed;
-        inset: 0;
-        z-index: 50;
-        background-color: rgba(0,0,0,0.6);
-        -webkit-backdrop-filter: blur(4px);
-        backdrop-filter: blur(4px);
-        opacity: 0;
-        transition: opacity 0.3s ease-out;
-        pointer-events: none;
-    }
-    #manual-selection-modal.open {
-        opacity: 1;
-        pointer-events: auto;
-    }
-    #manual-selection-modal.hidden {
-        display: none;
-    }
-
-    #modal-content {
-        /* Mobile-first: pannello a scorrimento */
-        background: var(--card-bg);
-        border: 1px solid var(--border-color);
-        position: absolute;
-        bottom: 0; left: 0; right: 0;
-        width: 100%;
-        max-height: 90vh; 
-        border-radius: 1.25rem 1.25rem 0 0;
-        transform: translateY(100%);
-        transition: transform 0.3s ease-out;
-        display: flex;
-        flex-direction: column;
-    }
-
-    #manual-selection-modal.open #modal-content {
-        transform: translateY(0);
-    }
-
-    /* Stili Desktop: riquadro centrato e scrollabile */
-    @media (min-width: 768px) {
-        /* ========= NUOVE REGOLE PER FIXARE POSIZIONAMENTO E SCROLL ========= */
-        #manual-selection-modal.open {
-            display: flex;
-            align-items: center;       /* Centra verticalmente */
-            justify-content: center;   /* Centra orizzontalmente */
-            overflow-y: auto;          /* Abilita scroll se il modale è più alto dello schermo */
-            padding: 2rem;             /* Spazio dai bordi dello schermo */
-        }
-        #modal-content {
-            position: relative;
-            bottom: auto;              /* Resetta lo stile mobile */
-            max-width: 80rem;
-            width: 100%;
-            transform: scale(0.95);
-            border-radius: 1.25rem;
-            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
-            opacity: 0;
-            max-height: calc(100vh - 4rem); /* Limita l'altezza per far stare il padding */
-        }
-        #manual-selection-modal.open #modal-content {
-            transform: scale(1);
-            opacity: 1;
-        }
-    }
-
-    /* Fix per visibilità modale in tema chiaro */
-    html:not(.dark) #modal-content {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(8px) saturate(100%);
-        -webkit-backdrop-filter: blur(8px) saturate(100%);
-    }
-
     /* Custom Checkbox */
     input[type="checkbox"] {
         appearance: none;
@@ -429,6 +354,21 @@
         border: 1px solid var(--border-color);
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
+    
+    /* ======== NUOVI STILI PER SEZIONE A COMPARSA ======== */
+    #manual-selection-section {
+        transition: all 0.3s ease-in-out;
+        overflow: hidden;
+    }
+    .transition-transform {
+        transition-property: transform;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 300ms;
+    }
+    .rotate-180 {
+        transform: rotate(180deg);
+    }
+
 
     /* Stili per la responsività mobile (da 768px in giù) */
     @media screen and (max-width: 768px) {
@@ -609,7 +549,7 @@
       </div>
 
       <div class="border-t border-border-color pt-6">
-        <button id="open-manual-modal-btn" class="w-full flex items-center justify-between p-4 rounded-lg border border-border-color cursor-pointer transition-all hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed group" disabled>
+        <button id="toggle-selection-btn" class="w-full flex items-center justify-between p-4 rounded-lg border border-border-color cursor-pointer transition-all hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed group" disabled>
           <div class="flex items-center gap-3">
             <svg class="w-6 h-6 text-foreground-muted group-hover:text-primary transition-colors" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>
             <div>
@@ -617,8 +557,49 @@
                 <p id="manual-selection-summary" class="text-xs text-foreground-muted">Carica un file JSON per abilitare</p>
             </div>
           </div>
-           <span id="manual-selection-badge" class="badge hidden">0 includi · 0 escludi</span>
+           <div class="flex items-center gap-3">
+             <span id="manual-selection-badge" class="badge hidden">0 includi · 0 escludi</span>
+             <svg id="toggle-selection-icon" class="w-5 h-5 text-foreground-muted transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+           </div>
         </button>
+        
+        <div id="manual-selection-section" class="hidden mt-4 p-4 md:p-6 border border-border-color rounded-lg bg-background/50">
+           <div class="space-y-4">
+              <div class="flex flex-col md:flex-row items-center justify-between gap-3">
+                  <div class="relative w-full md:flex-1">
+                      <input id="search-input" type="text" placeholder="Cerca per corso, sede, data..." class="w-full input-base pl-10 pr-3 py-2 h-[2.75rem]">
+                      <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/></svg>
+                  </div>
+                  <div class="flex items-center gap-4">
+                      <div class="flex items-center gap-2">
+                          <input id="show-only-picked" type="checkbox">
+                          <label for="show-only-picked" class="text-sm">Mostra solo selezionati</label>
+                      </div>
+                      <button id="refresh-list" class="btn btn-secondary !py-2 !px-3 !rounded-md !text-sm">Aggiorna</button>
+                  </div>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                  <button id="select-all-include" class="btn btn-secondary !text-sm !py-1 !px-3 !rounded-md">Includi tutti i risultati</button>
+                  <button id="select-all-exclude" class="btn btn-secondary !text-sm !py-1 !px-3 !rounded-md">Escludi tutti i risultati</button>
+                  <button id="unselect-all" class="btn btn-secondary !text-sm !py-1 !px-3 !rounded-md">Deseleziona tutti</button>
+              </div>
+              <div class="overflow-auto border border-border-color rounded-lg bg-background/80 max-h-[50vh]">
+                  <table class="table">
+                      <thead>
+                          <tr>
+                              <th style="width:80px">Includi</th>
+                              <th style="width:80px">Escludi</th>
+                              <th>Data</th>
+                              <th>Ora</th>
+                              <th>Corso</th>
+                              <th>Sede</th>
+                          </tr>
+                      </thead>
+                      <tbody id="exam-list"></tbody>
+                  </table>
+              </div>
+          </div>
+        </div>
       </div>
 
       <div class="text-center pt-4">
@@ -652,56 +633,6 @@
   <div id="toast" class="fixed bottom-5 right-5 bg-foreground-primary text-background py-2 px-5 rounded-full shadow-lg opacity-0 transition-all duration-300 flex items-center gap-3 transform translate-y-4">
     <span id="toast-message">Piano salvato con successo!</span>
   </div>
-
-  <div id="manual-selection-modal" class="hidden">
-      <div id="modal-content">
-          <div class="flex items-center justify-between p-4 border-b border-border-color flex-shrink-0">
-              <h3 class="text-xl font-bold text-foreground-primary">Selezione Manuale Appelli</h3>
-              <button id="close-manual-modal-btn" class="p-2 rounded-full hover:bg-slate-500/10">
-                  <svg class="w-6 h-6 text-foreground-muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-          </div>
-          <div class="p-4 space-y-4 overflow-y-auto">
-              <div class="flex flex-col md:flex-row items-center justify-between gap-3">
-                  <div class="relative w-full md:flex-1">
-                      <input id="search-input" type="text" placeholder="Cerca per corso, sede, data..." class="w-full input-base pl-10 pr-3 py-2 h-[2.75rem]">
-                      <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/></svg>
-                  </div>
-                  <div class="flex items-center gap-4">
-                      <div class="flex items-center gap-2">
-                          <input id="show-only-picked" type="checkbox">
-                          <label for="show-only-picked" class="text-sm">Mostra solo selezionati</label>
-                      </div>
-                      <button id="refresh-list" class="btn btn-secondary !py-2 !px-3 !rounded-md !text-sm">Aggiorna</button>
-                  </div>
-              </div>
-              <div class="flex flex-wrap gap-2">
-                  <button id="select-all-include" class="btn btn-secondary !text-sm !py-1 !px-3 !rounded-md">Includi tutti i risultati</button>
-                  <button id="select-all-exclude" class="btn btn-secondary !text-sm !py-1 !px-3 !rounded-md">Escludi tutti i risultati</button>
-                  <button id="unselect-all" class="btn btn-secondary !text-sm !py-1 !px-3 !rounded-md">Deseleziona tutti</button>
-              </div>
-              <div class="overflow-auto border border-border-color rounded-lg bg-background/80">
-                  <table class="table">
-                      <thead>
-                          <tr>
-                              <th style="width:80px">Includi</th>
-                              <th style="width:80px">Escludi</th>
-                              <th>Data</th>
-                              <th>Ora</th>
-                              <th>Corso</th>
-                              <th>Sede</th>
-                          </tr>
-                      </thead>
-                      <tbody id="exam-list"></tbody>
-                  </table>
-              </div>
-          </div>
-           <div class="p-4 border-t border-border-color text-right">
-                <button id="confirm-selection-btn" class="btn btn-secondary !rounded-md !px-5">Conferma Selezione</button>
-           </div>
-      </div>
-  </div>
-
 
   <script>
     // ===== Stato =====
@@ -737,8 +668,8 @@
     });
     if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.classList.add('dark');
-        document.getElementById('theme-icon-light').classList.add('hidden'); // Icona sole nascosta
-        document.getElementById('theme-icon-dark').classList.remove('hidden'); // Icona luna visibile
+        document.getElementById('theme-icon-light').classList.add('hidden');
+        document.getElementById('theme-icon-dark').classList.remove('hidden');
     } else {
         document.getElementById('theme-icon-light').classList.remove('hidden');
         document.getElementById('theme-icon-dark').classList.add('hidden');
@@ -804,7 +735,7 @@
             rawJson=JSON.parse(e.target.result); 
             const uniqueSedi = new Set(rawJson.map(e => prettySede(e.sede || '')));
             totalSediCount = uniqueSedi.size;
-            document.getElementById('open-manual-modal-btn').disabled = false;
+            document.getElementById('toggle-selection-btn').disabled = false;
             buildExamList(); 
             updateManualSelectionSummary(); 
             showToast('File caricato con successo'); 
@@ -813,39 +744,23 @@
       }; r.readAsText(f);
     }
 
-    // ===== Logica Modale =====
-    const openModalBtn = document.getElementById('open-manual-modal-btn');
-    const closeModalBtn = document.getElementById('close-manual-modal-btn');
-    const confirmSelectionBtn = document.getElementById('confirm-selection-btn');
-    const modal = document.getElementById('manual-selection-modal');
-    
-    function openManualSelectionModal() {
-        if (openModalBtn.disabled) return;
-        modal.classList.remove('hidden');
-        document.body.classList.add('modal-open');
-        setTimeout(() => {
-            modal.classList.add('open');
-        }, 10);
-    }
+    // ===== NUOVA LOGICA: Sezione a Comparsa (Accordion) =====
+    const toggleBtn = document.getElementById('toggle-selection-btn');
+    const selectionSection = document.getElementById('manual-selection-section');
+    const toggleIcon = document.getElementById('toggle-selection-icon');
 
-    function closeManualSelectionModal() {
-        modal.classList.remove('open');
-        setTimeout(() => {
-            if (!modal.classList.contains('open')) {
-                modal.classList.add('hidden');
-                document.body.classList.remove('modal-open');
-            }
-        }, 300);
-    }
-
-    openModalBtn.addEventListener('click', openManualSelectionModal);
-    closeModalBtn.addEventListener('click', closeManualSelectionModal);
-    confirmSelectionBtn.addEventListener('click', closeManualSelectionModal);
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeManualSelectionModal();
+    toggleBtn.addEventListener('click', () => {
+        if (toggleBtn.disabled) return;
+        
+        const isHidden = selectionSection.classList.toggle('hidden');
+        toggleIcon.classList.toggle('rotate-180', !isHidden);
+        
+        if (!isHidden) {
+            // Scrolla la sezione in vista quando viene aperta
+            selectionSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     });
+
 
     // ===== Ricerca / Tabella =====
     const searchInput=document.getElementById('search-input');
@@ -905,7 +820,8 @@
                 if (isChecked) {
                     pickedInclude.add(id);
                     pickedExclude.delete(id);
-                    const excludeCheckbox = modal.querySelector(`input[data-id="${id}"][data-action="exclude"]`);
+                    // Ora usiamo un selettore più generico perché il modale non c'è più
+                    const excludeCheckbox = document.querySelector(`input[data-id="${id}"][data-action="exclude"]`);
                     if (excludeCheckbox) excludeCheckbox.checked = false;
                 } else {
                     pickedInclude.delete(id);
@@ -914,7 +830,7 @@
                 if (isChecked) {
                     pickedExclude.add(id);
                     pickedInclude.delete(id);
-                    const includeCheckbox = modal.querySelector(`input[data-id="${id}"][data-action="include"]`);
+                    const includeCheckbox = document.querySelector(`input[data-id="${id}"][data-action="include"]`);
                     if (includeCheckbox) includeCheckbox.checked = false;
                 } else {
                     pickedExclude.delete(id);
@@ -943,7 +859,7 @@
     document.getElementById('select-all-exclude').addEventListener('click',()=>{ currentRows().forEach(r=>{ pickedExclude.add(r.id); pickedInclude.delete(r.id); }); buildExamList(); updateManualSelectionSummary(); });
     document.getElementById('unselect-all').addEventListener('click',()=>{ currentRows().forEach(r=>{ pickedExclude.delete(r.id); pickedInclude.delete(r.id); }); buildExamList(); updateManualSelectionSummary(); });
 
-    // ===== NUOVA FUNZIONE: Controllo Esami Disponibili =====
+    // ===== FUNZIONE: Controllo Esami Disponibili =====
     function checkUnavailableCourses(allExams, minDateStr, maxDateStr) {
         if (!allExams || allExams.length === 0) return [];
 
@@ -953,10 +869,7 @@
         const minDate = minDateStr ? new Date(minDateStr + 'T00:00:00') : null;
         const maxDate = maxDateStr ? new Date(maxDateStr + 'T23:59:59') : null;
 
-        // Se non ci sono date, nessun corso può essere disponibile, quindi sono tutti non disponibili
-        if (!minDate && !maxDate) {
-            return []; // O forse `allCourses`? No, se non filtro per data, sono tutti disponibili.
-        }
+        if (!minDate && !maxDate) return [];
 
         const availableCourses = new Set();
         for (const exam of allExams) {
@@ -996,7 +909,7 @@
     function computeManuallyExcludedCoursesForPeriod(){ const idsInPeriod=new Set(filteredRaw().map(e=>examId(e))); const excludedIds=[...pickedExclude].filter(id=>idsInPeriod.has(id)); const idToCourse=new Map(filteredRaw().map(e=>[examId(e), String(e.corso)])); const uniqueCourses=[...new Set(excludedIds.map(id=>idToCourse.get(id)))].filter(Boolean); return uniqueCourses; }
     function addToGoogleCalendar(exam){ const start=new Date(exam.dt).toISOString().replace(/-|:|\.\d\d\d/g,''); const end=new Date(new Date(exam.dt).getTime()+60*60*1000).toISOString().replace(/-|:|\.\d\d\d/g,''); const url=`https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Esame: '+exam.Corso)}&dates=${start}/${end}&details=${encodeURIComponent('Esame di '+exam.Corso)}&location=${encodeURIComponent(exam.Sede)}`; window.open(url,'_blank'); }
 
-    // ===== Output (MODIFICATO)=====
+    // ===== Output =====
     function displayResults(payload){
       const out=document.getElementById('results'), container=document.getElementById('results-container');
       const res=!payload.chosen?{chosen:payload,stats:{}}:(Array.isArray(payload)?{chosen:payload,stats:{total_unique_courses:payload.length,planned_unique:payload.length,unplanned_courses:[],used_sedi:[...new Set(payload.map(x=>x.sede_clean))],max_sedi:Infinity,reached_max_sedi:false,locked_not_scheduled:[]}}:payload);
@@ -1004,11 +917,10 @@
       
       container.classList.remove('hidden');
       container.classList.add('fade-in-up');
-      out.innerHTML = ''; // Pulisci i risultati precedenti
+      out.innerHTML = '';
       
       let headerHTML = '';
       
-      // NUOVO BLOCCO: Avviso esami non disponibili nel periodo
       const unavailableCourses = res.unavailable_courses || [];
       if (unavailableCourses.length > 0) {
           headerHTML += `<div class="rounded-lg border border-orange-400 bg-orange-50 dark:bg-orange-900/20 p-3 text-orange-700 dark:text-orange-300 mb-3"><b>Nessun appello nel periodo:</b> ${unavailableCourses.map(s => s.replace(/_/g, ' ')).join(' &middot; ')}</div>`;
@@ -1070,17 +982,16 @@
     document.getElementById('clear-plans-btn')?.addEventListener('click',()=>{ if(window.confirm('Eliminare tutti i piani salvati?')){ localStorage.removeItem('examPlans'); displaySavedPlans(); }});
     displaySavedPlans();
 
-    // ===== Run (MODIFICATO) =====
+    // ===== Run =====
     document.getElementById('run-btn').addEventListener('click',()=>{
       if(!rawJson.length){ showToast('Seleziona prima un file JSON!', 'error'); return; }
       let sedeVal=document.getElementById('free-sede-select').value; if(sedeVal==='Altro') sedeVal=document.getElementById('free-sede-other').value.trim();
       const params={ max_exams:+document.getElementById('max-exams').value, max_per_day:+document.getElementById('max-per-day').value, min_gap_days:+document.getElementById('min-gap-days').value, min_date:document.getElementById('min-date').value, max_date:document.getElementById('max-date').value, free_sede_exact:sedeVal, max_sedi:+document.getElementById('max-sedi').value || Infinity, locked_ids:[...pickedInclude], excluded_ids:[...pickedExclude] };
       
-      // Aggiunta chiamata alla nuova funzione
       const unavailable = checkUnavailableCourses(rawJson, params.min_date, params.max_date);
       
       const res=optimize(rawJson, params);
-      res.unavailable_courses = unavailable; // Aggiungo l'informazione ai risultati
+      res.unavailable_courses = unavailable;
       
       displayResults(res);
       document.getElementById('results-container').scrollIntoView({behavior:'smooth'});
@@ -1090,7 +1001,7 @@
     function setupCustomSelects() {
         document.querySelectorAll('select').forEach(selectElement => {
             if (selectElement.parentNode.classList.contains('custom-select-container')) {
-                return; // Già inizializzato
+                return;
             }
             const container = document.createElement('div');
             container.className = 'custom-select-container';
